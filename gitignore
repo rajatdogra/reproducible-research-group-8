@@ -1,0 +1,31 @@
+# R specific
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+
+# renv - ignore the library itself, keep the lockfile
+renv/library/
+renv/staging/
+renv/sandbox/
+renv/.cache/
+
+# Quarto / R Markdown rendered outputs (keep in output/ folders, not root)
+*_files/
+*_cache/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Credentials / secrets
+.env
+secrets/
+
+# Misc
+*.log
+*.tmp
+Thumbs.db
