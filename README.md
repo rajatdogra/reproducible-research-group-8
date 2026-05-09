@@ -15,7 +15,7 @@
 | Rajat Dogra | 474072 | [@rajatdogra](https://github.com/rajatdogra) |
 | Umair Aziz | 476686 | — |
 | Ashutosh Kumar Verma | 475852 | [@vermaashutosh777](https://github.com/vermaashutosh777) |
-| Ramik Sharma | 477656 | — |
+| Ramik Sharma | 477656 | — [@ramiksharma](https://github.com/RamikSharma)
 
 > All members contribute directly to this repository. Progress is tracked through commit history — commits from all four members are expected throughout the project.
 
