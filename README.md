@@ -13,7 +13,7 @@
 | Name | Student ID | GitHub |
 |------|-----------|--------|
 | Rajat Dogra | 474072 | [@rajatdogra](https://github.com/rajatdogra) |
-| Umair Aziz | 476686 | — |
+| Umair Aziz | 476686 | [@umairdev0](https://github.com/umairdev0) |
 | Ashutosh Kumar Verma | 475852 | [@vermaashutosh777](https://github.com/vermaashutosh777) |
 | Ramik Sharma | 477656 | [@ramiksharma](https://github.com/RamikSharma)
 
