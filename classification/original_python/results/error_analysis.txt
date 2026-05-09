@@ -1,0 +1,1 @@
+ERROR ANALYSIS REPORT\n==================================================\n\nBest Model: Stacking Ensemble\nTotal Errors: 5516/15925 (34.6%)\n\nError Breakdown by Class:\n- Home Win: 33.5% error rate\n- Draw: 40.3% error rate\n- Away Win: 30.2% error rate\n
