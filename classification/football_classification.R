@@ -337,7 +337,7 @@ model_features <- c(
   "leagueId", "venueId", "homeTeamId", "awayTeamId",
   # Temporal (7)
   "month", "day_of_week", "hour", "is_weekend",
-  "quarter", "is_holiday_season",
+  "quarter", "season", "is_holiday_season",
   # Team performance (6)
   "home_team_win_rate", "away_team_win_rate",
   "home_team_draw_rate", "away_team_draw_rate",
@@ -352,11 +352,18 @@ model_features <- c(
   "h2h_frequency"
 )
 
-# Add outcome (target)
+# Convert ID columns to factors before modelling
 df_model <- df %>%
   select(all_of(model_features), outcome) %>%
-  mutate(outcome = factor(outcome,
-                          levels = c("Home Win", "Draw", "Away Win")))
+  mutate(
+    outcome    = factor(outcome,
+                        levels = c("Home Win", "Draw", "Away Win")),
+    leagueId   = factor(leagueId),
+    venueId    = factor(venueId),
+    homeTeamId = factor(homeTeamId),
+    awayTeamId = factor(awayTeamId),
+    season     = factor(season)
+  )
 
 # Drop rows with any NA in features
 df_model <- df_model %>% drop_na()
@@ -391,7 +398,7 @@ cat("Building preprocessing recipe with SMOTE...\n")
 rec <- recipe(outcome ~ ., data = train_data) %>%
   step_other(leagueId, venueId, homeTeamId, awayTeamId,
              threshold = 0.01) %>%
-  step_dummy(all_nominal_predictors()) %>%
+  step_dummy(leagueId, venueId, homeTeamId, awayTeamId, season) %>%
   step_normalize(all_numeric_predictors()) %>%
   step_smote(outcome, over_ratio = 1)
 
