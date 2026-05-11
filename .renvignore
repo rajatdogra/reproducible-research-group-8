@@ -1,0 +1,14 @@
+# Ignore original Python files
+classification/original_python/
+regression/original_python/
+
+# Ignore data folders
+classification/data/
+regression/data/
+
+# Ignore output folders
+classification/output/
+regression/output/
+
+# Ignore docs
+docs/
