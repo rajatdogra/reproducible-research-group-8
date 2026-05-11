@@ -46,8 +46,13 @@ numeric_cols <- df |>
 
 correlations <- df |>
   select(all_of(c(numeric_cols, "final_score"))) |>
-  summarise(across(all_of(numeric_cols), ~ cor(.x, final_score, use = "complete.obs"))) |>
+  summarise(across(
+    all_of(numeric_cols),
+    ~ if (sd(.x, na.rm = TRUE) == 0) NA_real_
+      else cor(.x, final_score, use = "complete.obs")
+  )) |>
   pivot_longer(everything(), names_to = "feature", values_to = "correlation") |>
+  filter(!is.na(correlation)) |>
   mutate(abs_corr = abs(correlation)) |>
   arrange(desc(abs_corr))
 
