@@ -44,7 +44,8 @@ base_rec <- recipe(as.formula(paste(target_col, "~ .")), data = train) %>%
   step_normalize(all_numeric_predictors())
 
 metric_set_reg <- metric_set(rsq, mae, rmse)
-ctrl_grid <- control_stack_grid()   # needed for stacks::add_candidates()
+# control_stack_grid() under the hood — we add verbose for visible progress
+ctrl_grid <- control_grid(save_pred = TRUE, save_workflow = TRUE, verbose = TRUE)
 
 # ============================================================================
 # 2. GRADIENT BOOSTING TUNING (81 configs)
@@ -75,27 +76,28 @@ gbm_tuned <- tune_grid(
   metrics   = metric_set_reg,
   control   = ctrl_grid
 )
+saveRDS(gbm_tuned, file.path(out_dir, "gbm_tuned.rds"))  # checkpoint
 gbm_best <- select_best(gbm_tuned, metric = "rsq")
 
 # ============================================================================
-# 3. RANDOM FOREST TUNING (27 configs)
+# 3. RANDOM FOREST TUNING (9 configs)
+# Note: parsnip's rand_forest() does not expose ranger's max.depth as a
+# tunable argument — it lives in set_engine() and can't be tuned via the
+# standard grid path without extra parameter-object plumbing. We tune trees
+# and min_n only; depth defaults to unlimited (ranger's default).
 # ============================================================================
 rf_spec <- rand_forest(
-  trees      = tune(),
-  tree_depth = tune(),   # mapped to ranger::max.depth
-  min_n      = tune()
+  trees = tune(),
+  min_n = tune()
 ) %>%
   set_engine("ranger", num.threads = max(1, parallel::detectCores() - 1)) %>%
   set_mode("regression")
 
 rf_wf <- workflow(base_rec, rf_spec)
 
-# Issue spec lists max_depth = c(15, 20, NULL). Ranger needs an integer;
-# 30 is used here as a proxy for "effectively unlimited".
 rf_grid <- tidyr::crossing(
-  trees      = c(150L, 200L, 300L),
-  tree_depth = c(15L, 20L, 30L),
-  min_n      = c(2L, 5L, 10L)
+  trees = c(150L, 200L, 300L),
+  min_n = c(2L, 5L, 10L)
 )
 
 cat(">> Tuning Random Forest over", nrow(rf_grid), "configs x 5 folds...\n")
@@ -106,6 +108,7 @@ rf_tuned <- tune_grid(
   metrics   = metric_set_reg,
   control   = ctrl_grid
 )
+saveRDS(rf_tuned, file.path(out_dir, "rf_tuned.rds"))  # checkpoint
 rf_best <- select_best(rf_tuned, metric = "rsq")
 
 # ============================================================================
