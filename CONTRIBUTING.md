@@ -3,14 +3,14 @@
 ## Branch naming
 
 ```
-feature/<issue-number>-short-description
+feat/<issue-number>-short-description
 fix/<issue-number>-short-description
 docs/<issue-number>-short-description
 chore/<issue-number>-short-description
 ```
 
 Examples:
-- `feature/1-regression-eda`
+- `feat/1-regression-eda`
 - `docs/10-readme-update`
 
 ## Commit messages
