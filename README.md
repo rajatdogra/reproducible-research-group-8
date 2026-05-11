@@ -140,7 +140,7 @@ Outputs include model comparison tables, performance metrics, and visualisations
 
 ## 🔄 Team Workflow
 
-1. All members push directly to the `main` branch of this repository
+1. All team members/contributors - MUST follow the workflow in CONTRIBUTING.md: Create a branch, submit a PR, and wait for review before merging to main in this repository.
 2. Always `git pull` before starting work to avoid conflicts
 3. Use meaningful commit messages (e.g. `"add feature engineering step for cricket run rate"` not `"update"`)
 4. Commits from all four members are expected and will be reviewed by the instructor
