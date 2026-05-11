@@ -9,6 +9,7 @@
 
 library(here)
 library(tidyverse)
+library(tidymodels)
 
 # =============================================================================
 # Section 2: Data Loading and EDA
@@ -133,8 +134,60 @@ cat("Plots: 01_score_distribution.png, 02_team_avg_score.png,",
     "03_venue_effects.png, 04_wickets_vs_score.png\n")
 
 # =============================================================================
-# TODO: Feature engineering (issue #2)
+# Section 3: Feature Engineering & Train/Test Split
+# Replicates Section 3 of Cricket_Score_Prediction_Final_Submission.ipynb
 # =============================================================================
+
+# ── 3.1 Feature selection (matching Python's 12-feature set) ──────────────────
+features <- c(
+  "innings", "team", "wickets_lost", "balls_faced",
+  "venue", "city", "toss_winner", "toss_decision",
+  "year", "month", "day", "target_score"
+)
+
+df_model <- df |> select(all_of(c(features, "final_score")))
+
+cat("\nFeature set:", length(features), "features,", nrow(df_model), "samples\n")
+
+# ── 3.2 Train/test split — 80/20, seed 42 (matches Python) ───────────────────
+set.seed(42)
+split  <- initial_split(df_model, prop = 0.8)
+df_train <- training(split)
+df_test  <- testing(split)
+
+cat(sprintf(
+  "Training: %d rows  |  Testing: %d rows\n",
+  nrow(df_train), nrow(df_test)
+))
+cat(sprintf(
+  "Train mean: %.1f  |  Test mean: %.1f\n",
+  mean(df_train$final_score), mean(df_test$final_score)
+))
+
+# ── 3.3 Preprocessing recipe ──────────────────────────────────────────────────
+# Mirrors Python pipeline:
+#   - target_score NAs → 0 (step_impute_median)
+#   - high-cardinality categoricals collapsed (step_other)
+#   - one-hot encoding (step_dummy)
+#   - normalise numerics (step_normalize) — StandardScaler equivalent
+#   - polynomial degree-2 on numeric predictors (step_poly)
+rec <- recipe(final_score ~ ., data = df_train) |>
+  step_impute_median(target_score) |>
+  step_other(team, venue, city, toss_winner, threshold = 0.02) |>
+  step_dummy(team, venue, city, toss_winner, toss_decision,
+             one_hot = TRUE) |>
+  step_normalize(all_numeric_predictors()) |>
+  step_poly(innings, wickets_lost, balls_faced, year,
+            degree = 2, keep_original_cols = FALSE)
+
+rec_prep <- prep(rec, training = df_train)
+
+train_baked <- bake(rec_prep, new_data = df_train)
+test_baked  <- bake(rec_prep, new_data = df_test)
+
+cat("\nEngineered feature count:", ncol(train_baked) - 1, "\n")
+cat("Train set after baking:", nrow(train_baked), "rows\n")
+cat("Test  set after baking:", nrow(test_baked),  "rows\n")
 
 # =============================================================================
 # TODO: Model training — Linear, Ridge, Lasso, Random Forest, XGBoost (issue #3)
