@@ -4,11 +4,11 @@
 **Course:** Reproducible Research  
 **University:** University of Warsaw, Faculty of Economic Sciences  
 **Submission Repository:** [rajatdogra/reproducible-research-group-8](https://github.com/rajatdogra/reproducible-research-group-8)  
-**Date:** 2026
+**Date:** May/13/2026
 
 ---
 
-## 👥 Team Members
+## Team Members
 
 | Name | Student ID | GitHub |
 |------|-----------|--------|
@@ -21,15 +21,15 @@
 
 ---
 
-## 📌 What This Project Does
+## What This Project Does
 
 This project reproduces and rewrites in **R** two machine learning pipelines originally developed in Python for the **ML2 – Machine Learning 2** course (submitted January 10, 2026). The goal is full reproducibility: same datasets, same analytical questions, comparable results — implemented end-to-end in R using `tidyverse`, `tidymodels`, and related packages.
 
 ---
 
-## 📁 Projects
+## Projects
 
-### Project 1 — Regression: Cricket Score Prediction 🏏
+### Project 1 — Regression: Cricket Score Prediction
 
 | Item | Detail |
 |------|--------|
@@ -39,7 +39,7 @@ This project reproduces and rewrites in **R** two machine learning pipelines ori
 | **Python Baseline** | Random Forest — R² = 0.89, RMSE = 12.4 runs |
 | **Key Features** | Current run rate, wickets fallen, venue, team performance |
 
-### Project 2 — Classification: Football Match Outcomes ⚽
+### Project 2 — Classification: Football Match Outcomes
 
 | Item | Detail |
 |------|--------|
@@ -51,7 +51,7 @@ This project reproduces and rewrites in **R** two machine learning pipelines ori
 
 ---
 
-## 🗂️ Repository Structure
+##  Repository Structure
 
 ```
 reproducible-research-group-8/
@@ -73,7 +73,7 @@ reproducible-research-group-8/
 
 ---
 
-## ⚙️ Requirements
+## Requirements
 
 - **R** >= 4.3
 - **Quarto** >= 1.4 (for rendering reports)
@@ -82,7 +82,7 @@ reproducible-research-group-8/
 
 ---
 
-## 🚀 Setup
+## Setup
 
 ```bash
 # 1. Clone the repository
@@ -97,7 +97,7 @@ Rscript -e 'renv::restore()'
 
 ---
 
-## ▶️ How to Run
+## How to Run
 
 ```bash
 # Render the regression report
@@ -110,13 +110,14 @@ quarto render classification/football_classification.Rmd
 Or run the scripts directly in R:
 
 ```r
-source("regression/cricket_score_prediction.R")
+# Issues #5 and #6: EDA and feature engineering
+# Issues #7 and #8: model training, evaluation, plots, error analysis
 source("classification/football_classification.R")
 ```
 
 ---
 
-## 📤 Expected Output
+## Expected Output
 
 | Project | Output Location | Approx. Runtime |
 |---------|----------------|-----------------|
@@ -127,7 +128,7 @@ Outputs include model comparison tables, performance metrics, and visualisations
 
 ---
 
-## 🗃️ Data
+## Data
 
 | Dataset | Source | Location in Repo |
 |---------|--------|-----------------|
@@ -138,7 +139,7 @@ Outputs include model comparison tables, performance metrics, and visualisations
 
 ---
 
-## 🔄 Team Workflow
+## Team Workflow
 
 1. All team members/contributors - MUST follow the workflow in CONTRIBUTING.md: Create a branch, submit a PR, and wait for review before merging to main in this repository.
 2. Always `git pull` before starting work to avoid conflicts
@@ -147,25 +148,28 @@ Outputs include model comparison tables, performance metrics, and visualisations
 
 ```bash
 git pull origin main          # pull latest before working
+git checkout -b feat/7-classification-model-training
 # ... make changes ...
 git add .
-git commit -m "descriptive message about what you changed"
+git commit -m "feat: descriptive message about what changed"
+git push origin feat/7-classification-model-training
+# then open a PR on GitHub referencing Closes #7
 git push origin main
 ```
 
 ---
 
-## 📊 Results Summary
+## Results Summary
 
 | Project | Best Model (Python) | Metric | R Replication Status |
 |---------|-------------------|--------|----------------------|
-| Cricket Regression | Random Forest | R² = 0.89, RMSE = 12.4 runs | 🔄 In progress |
-| Football Classification | Stacking Ensemble | Accuracy = 65.36%, F1 = 0.6533 | 🔄 In progress |
+| Cricket Regression | Random Forest | R² = 0.89, RMSE = 12.4 runs | In progress |
+| Football Classification | Stacking Ensemble | Accuracy = 65.36%, F1 = 0.6533 | See classification/output/comprehensive_results.txt |
 
 > This table will be updated as R results are produced.
 
 ---
 
-## 📎 Original ML2 Reference
+## Original Project Reference used for Reproducible Research
 
 The original Python-based ML2 project (Rajat Dogra & Umair Aziz, January 2026) serves as the baseline for this reproducibility exercise. Dataset sources and problem definitions remain identical.
