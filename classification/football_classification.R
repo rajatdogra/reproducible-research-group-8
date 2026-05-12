@@ -706,3 +706,261 @@ lines <- c(lines,
 writeLines(lines, file.path(output_dir, "comprehensive_results.txt"))
 
 cat("\n✓ Issue # 7 - Complete; models trained, comprehensive_results.txt saved\n")
+
+
+# =============================================================================
+# Football Match Outcome Prediction — Classification
+# Group 8 | Reproducible Research | University of Warsaw 2025-2026
+# =============================================================================
+# Author  : Ramik Sharma (477656)
+# Issue   : #8 — Visualisations, Error Analysis & Ethical Considerations
+# Dataset : ESPN Soccer Data 2024-2026 (Kaggle)
+# =============================================================================
+# Loads artefacts from Issue #7 and produces three plots, error_analysis.txt,
+# and ethical_considerations.txt — all to classification/output/
+# =============================================================================
+
+library(patchwork)
+
+cat("\n", strrep("=", 60), "\n", sep = "")
+cat("ISSUE # 8. — VISUALISATIONS, ERROR ANALYSIS AND ETHICS\n")
+cat(strrep("=", 60), "\n\n", sep = "")
+
+# The objects eval_results, all_preds, all_per_class, cm_best, best_name,
+# per_class, outcome_levels, output_dir are all already in the environment
+# from Issue # 7. If running this section standalone, ensure reloading them:
+if (!exists("eval_results")) {
+  eval_results  <- readRDS(file.path(output_dir, "eval_results.rds"))
+  all_preds     <- readRDS(file.path(output_dir, "all_preds.rds"))
+  all_per_class <- readRDS(file.path(output_dir, "all_per_class.rds"))
+  cm_best       <- readRDS(file.path(output_dir, "cm_best.rds"))
+  per_class     <- readRDS(file.path(output_dir, "per_class_best.rds"))
+  rf_final      <- readRDS(file.path(output_dir, "rf_final.rds"))
+  best_name     <- eval_results$model[which.max(eval_results$accuracy)]
+}
+
+model_colours <- c(
+  "Random Forest"     = "#4E79A7",
+  "Gradient Boosting" = "#F28E2B",
+  "XGBoost"           = "#E15759",
+  "Neural Network"    = "#76B7B2",
+  "Stacking Ensemble" = "#59A14F"
+)
+
+bar_theme <- theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1, size = 9),
+        panel.grid.major.x = element_blank(),
+        legend.position = "none")
+
+# =============================================================================
+# PLOT 1 — Dashboard - Model performance (with a 2x2 grid)
+# =============================================================================
+p_acc <- ggplot(eval_results,
+                aes(x = reorder(model, accuracy), y = accuracy, fill = model)) +
+  geom_col(alpha = 0.85, width = 0.65) +
+  geom_text(aes(label = sprintf("%.3f", accuracy)), vjust = -0.4, size = 3.2) +
+  scale_fill_manual(values = model_colours) +
+  scale_y_continuous(limits = c(0,1), expand = expansion(mult = c(0, 0.07))) +
+  labs(title = "Accuracy Comparison", x = NULL, y = "Accuracy") +
+  bar_theme
+
+p_f1 <- ggplot(eval_results,
+               aes(x = reorder(model, f1_weighted), y = f1_weighted, fill = model)) +
+  geom_col(alpha = 0.85, width = 0.65) +
+  geom_text(aes(label = sprintf("%.3f", f1_weighted)), vjust = -0.4, size = 3.2) +
+  scale_fill_manual(values = model_colours) +
+  scale_y_continuous(limits = c(0,1), expand = expansion(mult = c(0, 0.07))) +
+  labs(title = "F1-Score Comparison", x = NULL, y = "F1-Score (Weighted)") +
+  bar_theme
+
+p_auc <- ggplot(eval_results,
+                aes(x = reorder(model, auc), y = auc, fill = model)) +
+  geom_col(alpha = 0.85, width = 0.65) +
+  geom_text(aes(label = sprintf("%.3f", auc)), vjust = -0.4, size = 3.2) +
+  scale_fill_manual(values = model_colours) +
+  scale_y_continuous(limits = c(0,1), expand = expansion(mult = c(0, 0.07))) +
+  labs(title = "AUC Score Comparison", x = NULL, y = "AUC Score") +
+  bar_theme
+
+cm_tidy <- as_tibble(cm_best$table) %>%
+  rename(Truth = truth, Prediction = estimate, Count = n) %>%
+  mutate(Truth      = factor(Truth,      levels = outcome_levels),
+         Prediction = factor(Prediction, levels = outcome_levels))
+
+p_cm <- ggplot(cm_tidy, aes(x = Prediction, y = Truth, fill = Count)) +
+  geom_tile(colour = "white", linewidth = 0.5) +
+  geom_text(aes(label = Count), size = 4.5, fontface = "bold") +
+  scale_fill_gradient(low = "#DEEBF7", high = "#2171B5") +
+  scale_x_discrete(limits = outcome_levels) +
+  scale_y_discrete(limits = rev(outcome_levels)) +
+  labs(title = sprintf("Confusion Matrix — %s", best_name),
+       x = "Predicted", y = "Actual", fill = "Count") +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+
+combined_plot <- (p_acc | p_f1) / (p_auc | p_cm) +
+  plot_annotation(
+    title    = "Football Match Outcome — Model Performance Dashboard",
+    subtitle = "Accuracy, F1, AUC and best-model confusion matrix",
+    theme    = theme(plot.title    = element_text(size = 14, face = "bold"),
+                     plot.subtitle = element_text(size = 10, colour = "grey40"))
+  )
+
+ggsave(file.path(output_dir, "model_performance_comparison.png"),
+       combined_plot, width = 16, height = 12, dpi = 300, bg = "white")
+cat("Saved: model_performance_comparison.png\n")
+
+# =============================================================================
+# PLOT 2 — Per-class precision and recall (grouping based bar charts)
+# =============================================================================
+all_per_class <- all_per_class %>%
+  mutate(class = factor(class, levels = outcome_levels),
+         model = factor(model, levels = c("Random Forest","Gradient Boosting",
+                                          "XGBoost","Neural Network","Stacking Ensemble")))
+
+p_prec <- ggplot(all_per_class,
+                 aes(x = class, y = precision, fill = model)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.75, alpha = 0.85) +
+  scale_fill_manual(values = model_colours, name = "Model") +
+  scale_y_continuous(limits = c(0,1), expand = expansion(mult = c(0,0.05))) +
+  labs(title = "Precision by Class and Model", x = "Outcome Class", y = "Precision") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", panel.grid.major.x = element_blank())
+
+p_rec <- ggplot(all_per_class,
+                aes(x = class, y = recall, fill = model)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.75, alpha = 0.85) +
+  scale_fill_manual(values = model_colours, name = "Model") +
+  scale_y_continuous(limits = c(0,1), expand = expansion(mult = c(0,0.05))) +
+  labs(title = "Recall by Class and Model", x = "Outcome Class", y = "Recall") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", panel.grid.major.x = element_blank())
+
+per_class_plot <- (p_prec | p_rec) + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+
+ggsave(file.path(output_dir, "per_class_performance.png"),
+       per_class_plot, width = 16, height = 6, dpi = 300, bg = "white")
+cat("Saved: per_class_performance.png\n")
+
+# =============================================================================
+# PLOT 3 — Top 15 feature importance from the Random Forest
+# =============================================================================
+rf_engine <- extract_fit_engine(rf_final)
+
+if (!is.null(rf_engine$variable.importance) &&
+    length(rf_engine$variable.importance) > 0) {
+  importance_df <- tibble(
+    feature    = names(rf_engine$variable.importance),
+    importance = as.numeric(rf_engine$variable.importance)
+  ) %>%
+    arrange(desc(importance)) %>%
+    slice_head(n = 15)
+  
+  p_imp <- ggplot(importance_df,
+                  aes(x = reorder(feature, importance), y = importance)) +
+    geom_col(fill = "#4E79A7", alpha = 0.85, width = 0.75) +
+    coord_flip() +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    labs(title    = "Top 15 Feature Importances (Random Forest)",
+         subtitle = "Gini impurity-based importance scores",
+         x = "Feature", y = "Importance Score") +
+    theme_minimal(base_size = 11) +
+    theme(panel.grid.major.y = element_blank(), axis.text.y = element_text(size = 9))
+  
+  ggsave(file.path(output_dir, "feature_importance.png"),
+         p_imp, width = 12, height = 8, dpi = 300, bg = "white")
+  cat("Saved: feature_importance.png\n\n")
+} else {
+  cat("WARNING: importance not available — ensure importance='impurity' in rf_spec\n\n")
+}
+
+# =============================================================================
+# ERROR ANALYSIS FOR MODEL
+# =============================================================================
+best_preds_ea <- all_preds[[best_name]] %>%
+  mutate(outcome     = factor(outcome,     levels = outcome_levels),
+         .pred_class = factor(.pred_class, levels = outcome_levels),
+         misclassified = outcome != .pred_class)
+
+n_test    <- nrow(best_preds_ea)
+n_errors  <- sum(best_preds_ea$misclassified)
+error_pct <- n_errors / n_test * 100
+
+per_class_err <- map_dfr(outcome_levels, function(cls) {
+  rows  <- best_preds_ea %>% filter(outcome == cls)
+  errs  <- rows %>% filter(misclassified)
+  wrong <- if (nrow(errs) > 0)
+    as.character(errs %>% count(.pred_class, sort=TRUE) %>% slice(1) %>% pull(.pred_class))
+  else "N/A"
+  tibble(class = cls, total = nrow(rows), errors = nrow(errs),
+         error_rate_pct = nrow(errs)/nrow(rows)*100, most_common_wrong = wrong)
+})
+
+err_lines <- c(
+  "ERROR ANALYSIS REPORT", strrep("=", 50), "",
+  sprintf("Best Model: %s", best_name),
+  sprintf("Total Errors: %d / %d (%.1f%%)", n_errors, n_test, error_pct), ""
+)
+for (i in seq_len(nrow(per_class_err))) {
+  r <- per_class_err[i,]
+  err_lines <- c(err_lines,
+                 sprintf("%s:", r$class),
+                 sprintf("  Total samples : %d", r$total),
+                 sprintf("  Misclassified : %d", r$errors),
+                 sprintf("  Error rate    : %.1f%%", r$error_rate_pct),
+                 sprintf("  Most often misclassified as: %s", r$most_common_wrong), "")
+}
+err_lines <- c(err_lines,
+               "PYTHON BASELINE (Stacking Ensemble):",
+               "  Total Errors : 5516 / 15925 (34.6%)",
+               "  Home Win     : 33.5% error rate",
+               "  Draw         : 40.3% error rate",
+               "  Away Win     : 30.2% error rate")
+writeLines(err_lines, file.path(output_dir, "error_analysis.txt"))
+cat("Saved: error_analysis.txt\n")
+
+# =============================================================================
+# ETHICAL CONSIDERATIONS AND BIAS ANALYSIS
+# =============================================================================
+eth_lines <- c(
+  "ETHICAL CONSIDERATIONS AND BIAS ANALYSIS",
+  strrep("=", 45), "",
+  "Project: Football Match Outcome Classification (R Replication)",
+  "Group 8 | Reproducible Research | University of Warsaw 2025-2026", "",
+  "1. DATA BIAS CONSIDERATIONS:",
+  "   - Historical bias: model learns from past records which may encode",
+  "     structural advantages of well-funded or dominant leagues.",
+  "   - Temporal bias: team form changes; older seasons may not reflect",
+  "     present-day performance.",
+  "   - Geographic bias: European top-flight leagues dominate the dataset,",
+  "     leaving lower-profile and non-European football under-represented.", "",
+  "2. FAIRNESS CONCERNS:",
+  "   - Team fairness: model may over-predict wins for historically strong teams.",
+  "   - League fairness: generalisation across leagues is uneven.",
+  "   - Venue fairness: home advantage signal may amplify structural inequality.", "",
+  "3. POTENTIAL MISUSE:",
+  "   - Gambling: must NOT be used to inform betting decisions.",
+  "     Error rate is ~34-35%; over-reliance could cause financial harm.",
+  "   - Match fixing: public predictions could motivate manipulation.",
+  "   - Financial decisions: transfers or sponsorship must not rely on this model.", "",
+  "4. TRANSPARENCY:",
+  "   - Feature importance charts provided (Random Forest Gini scores).",
+  "   - Model limitations documented; ~65% accuracy is a realistic ceiling.",
+  "   - Confidence calibration not formally evaluated.",
+  "   - All code is open, version-controlled, reproducible via renv.lock.", "",
+  "5. RECOMMENDATIONS:",
+  "   - Retrain at the start of each season with recent data.",
+  "   - Monitor prediction distributions per league for demographic drift.",
+  "   - Provide confidence intervals alongside point predictions.",
+  "   - Include responsible-use disclaimer before any deployment.",
+  "   - Conduct a bias audit across leagues and competitive tiers.", "",
+  strrep("-", 45),
+  "Prepared for Reproducible Research course, University of Warsaw 2025-2026)",
+  "Replicates ethical section from the original Python ML2 project",
+  "(Rajat Dogra & Umair Aziz, January 2026)."
+)
+writeLines(eth_lines, file.path(output_dir, "ethical_considerations.txt"))
+cat("Saved: ethical_considerations.txt\n")
+
+cat("\n✓ Issue # 8 - Completed; plots and text reports saved to classification/output/\n")
