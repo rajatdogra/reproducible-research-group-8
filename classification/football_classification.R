@@ -434,3 +434,275 @@ cat("Saved: train_baked.rds\n")
 
 cat("\n✓ Issue #6 complete — feature engineering done,",
     "processed data saved to classification/output/\n")
+
+
+
+
+# =============================================================================
+# Football Match Outcome Prediction — Classification
+# Group 8 | Reproducible Research | University of Warsaw 2025-2026
+# =============================================================================
+# Author  : Ramik Sharma (477656)
+# Issue   : #7 — Model Training & Evaluation
+# Dataset : ESPN Soccer Data 2024-2026 (Kaggle)
+# =============================================================================
+# Picks up from the RDS files saved by Issue #6.
+# Trains RF, GB, XGBoost, NN, and Stacking Ensemble via tidymodels.
+# Writes comprehensive_results.txt to classification/output/
+# =============================================================================
+library(tidymodels)
+library(ranger)
+library(xgboost)
+library(brulee)
+library(stacks)
+library(yardstick)
+
+options(xgboost.verbose = 0)
+set.seed(42)
+
+output_dir     <- here("classification", "output")
+outcome_levels <- c("Home Win", "Draw", "Away Win")
+# Re-enforcing factor levels on the data that Issue #6 already created (they are already in the environment
+# ; this is a safety re-casting)
+train_data <- train_data %>%
+  mutate(outcome = factor(outcome, levels = outcome_levels))
+test_data  <- test_data  %>%
+  mutate(outcome = factor(outcome, levels = outcome_levels))
+
+cat("Training rows:", nrow(train_data), "| Testing rows:", nrow(test_data), "\n\n")
+
+# =============================================================================
+# RECIPE — rebuilt so every CV fold bakes its own copy
+# =============================================================================
+
+id_cols <- c("leagueId", "venueId", "homeTeamId", "awayTeamId")
+
+base_recipe <- recipe(outcome ~ ., data = train_data) %>%
+  step_other(all_of(id_cols), threshold = 0.01) %>%
+  step_dummy(all_of(id_cols), season, one_hot = FALSE) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_smote(outcome, over_ratio = 1)
+
+# =============================================================================
+# BALANCED CLASS WEIGHTS for Random Forest
+# Mirrors sklearn class_weight='balanced': w_j = n / (k * n_j)
+# =============================================================================
+class_counts  <- table(train_data$outcome)
+balanced_wts  <- sum(class_counts) / (length(class_counts) * as.numeric(class_counts))
+names(balanced_wts) <- names(class_counts)
+cat("Balanced class weights:\n"); print(round(balanced_wts, 4)); cat("\n")
+
+# =============================================================================
+# MODEL SPECIFICATIONS
+# =============================================================================
+# Random Forest — Python: n_estimators=300, max_depth=12, min_samples_split=5
+rf_spec <- rand_forest(trees = 300, min_n = 5) %>%
+  set_engine("ranger",
+             max.depth     = 12,
+             class.weights = balanced_wts,
+             importance    = "impurity",
+             seed          = 42,
+             num.threads   = 1) %>%
+  set_mode("classification")
+
+# Gradient Boosting — Python: n_estimators=300, max_depth=8, lr=0.1, subsample=0.8
+gb_spec <- boost_tree(trees = 300, tree_depth = 8,
+                      learn_rate = 0.1, sample_size = 0.8) %>%
+  set_engine("xgboost", booster = "gbtree",
+             eval_metric = "mlogloss", nthread = 1, seed = 42) %>%
+  set_mode("classification")
+
+# XGBoost — Python: n_estimators=300, max_depth=6, lr=0.1, subsample=0.8, colsample_bytree=0.8
+xgb_spec <- boost_tree(trees = 300, tree_depth = 6,
+                       learn_rate = 0.1, sample_size = 0.8, mtry = 0.8) %>%
+  set_engine("xgboost", counts = FALSE,
+             eval_metric = "mlogloss", nthread = 1, seed = 42) %>%
+  set_mode("classification")
+
+# Neural Network — Python: hidden=(150,100,50), alpha=0.001, lr_init=0.001, max_iter=300
+nn_spec <- mlp(hidden_units = c(150L, 100L, 50L),
+               epochs = 300, learn_rate = 0.001, dropout = 0.001) %>%
+  set_engine("brulee", seed = 42) %>%
+  set_mode("classification")
+
+cat("Model specs defined for all models: RF | GB | XGBoost | NN\n\n")
+
+# =============================================================================
+# ADDING WORKFLOWS
+# =============================================================================
+rf_wf  <- workflow() %>% add_recipe(base_recipe) %>% add_model(rf_spec)
+gb_wf  <- workflow() %>% add_recipe(base_recipe) %>% add_model(gb_spec)
+xgb_wf <- workflow() %>% add_recipe(base_recipe) %>% add_model(xgb_spec)
+nn_wf  <- workflow() %>% add_recipe(base_recipe) %>% add_model(nn_spec)
+
+# =============================================================================
+# 5-FOLD STRATIFIED CV
+# Mirrors Python: StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+# =============================================================================
+set.seed(42)
+folds <- vfold_cv(train_data, v = 5, strata = outcome)
+
+cv_metrics  <- metric_set(accuracy, f_meas, roc_auc)
+ctrl_stack  <- control_resamples(save_pred = TRUE, save_workflow = TRUE, verbose = FALSE)
+ctrl_plain  <- control_resamples(save_pred = TRUE, verbose = FALSE)
+
+cat("Fitting CV — Random Forest...\n");       set.seed(42); rf_res  <- fit_resamples(rf_wf,  folds, metrics = cv_metrics, control = ctrl_stack)
+cat("Fitting CV — Gradient Boosting...\n");   set.seed(42); gb_res  <- fit_resamples(gb_wf,  folds, metrics = cv_metrics, control = ctrl_stack)
+cat("Fitting CV — XGBoost...\n");             set.seed(42); xgb_res <- fit_resamples(xgb_wf, folds, metrics = cv_metrics, control = ctrl_stack)
+cat("Fitting CV — Neural Network...\n");      set.seed(42); nn_res  <- fit_resamples(nn_wf,  folds, metrics = cv_metrics, control = ctrl_plain)
+cat("All CV fits - complete.\n\n")
+
+cv_summary <- bind_rows(
+  collect_metrics(rf_res)  %>% mutate(model = "Random Forest"),
+  collect_metrics(gb_res)  %>% mutate(model = "Gradient Boosting"),
+  collect_metrics(xgb_res) %>% mutate(model = "XGBoost"),
+  collect_metrics(nn_res)  %>% mutate(model = "Neural Network")
+) %>% select(model, .metric, mean, std_err)
+
+cat("5-Fold CV Mean Metrics:\n"); print(cv_summary, n = Inf); cat("\n")
+
+# =============================================================================
+# STACKING ENSEMBLE
+# RF + GB + XGB as base learners; elastic-net meta-learner (= LR equivalent)
+# =============================================================================
+cat("Building stacking ensemble.......\n")
+set.seed(42)
+stack_model <- stacks() %>%
+  add_candidates(rf_res)  %>%
+  add_candidates(gb_res)  %>%
+  add_candidates(xgb_res) %>%
+  blend_predictions(penalty = 10 ^ seq(-6, -1, length.out = 20), mixture = 1) %>%
+  fit_members()
+cat("Stacking ensemble is now ready.\n\n")
+
+# =============================================================================
+# FITTING FINAL MODELS ON FULL TRAINING DATA (for test-set predictions)
+# =============================================================================
+cat("Fitting final models on full training data.....\n")
+set.seed(42); rf_final  <- fit(rf_wf,  train_data)
+set.seed(42); gb_final  <- fit(gb_wf,  train_data)
+set.seed(42); xgb_final <- fit(xgb_wf, train_data)
+set.seed(42); nn_final  <- fit(nn_wf,  train_data)
+cat("All models fitted now.\n\n")
+
+# =============================================================================
+# EVALUATING TEST-SET
+# =============================================================================
+get_test_preds <- function(fitted_wf, new_data) {
+  bind_cols(
+    new_data %>% select(outcome),
+    predict(fitted_wf, new_data, type = "class"),
+    predict(fitted_wf, new_data, type = "prob")
+  )
+}
+
+rf_preds    <- get_test_preds(rf_final,  test_data)
+gb_preds    <- get_test_preds(gb_final,  test_data)
+xgb_preds   <- get_test_preds(xgb_final, test_data)
+nn_preds    <- get_test_preds(nn_final,  test_data)
+stack_preds <- bind_cols(
+  test_data %>% select(outcome),
+  predict(stack_model, test_data, type = "class"),
+  predict(stack_model, test_data, type = "prob")
+)
+all_preds <- list(
+  "Random Forest"     = rf_preds,
+  "Gradient Boosting" = gb_preds,
+  "XGBoost"           = xgb_preds,
+  "Neural Network"    = nn_preds,
+  "Stacking Ensemble" = stack_preds
+)
+
+prob_cols <- paste0(".pred_", outcome_levels)
+
+eval_results <- map_dfr(names(all_preds), function(nm) {
+  p   <- all_preds[[nm]]
+  acc <- accuracy(p, truth = outcome, estimate = .pred_class)$.estimate
+  f1  <- f_meas(p,   truth = outcome, estimate = .pred_class, estimator = "weighted")$.estimate
+  auc <- roc_auc(p,  truth = outcome, any_of(prob_cols), estimator = "macro_weighted")$.estimate
+  tibble(model = nm, accuracy = acc, f1_weighted = f1, auc = auc)
+})
+
+cat(sprintf("%-20s  %8s  %8s  %8s\n", "Model", "Accuracy", "F1(wt)", "AUC"))
+cat(strrep("-", 52), "\n")
+for (i in seq_len(nrow(eval_results))) {
+  r <- eval_results[i,]
+  cat(sprintf("%-20s  %7.2f%%  %8.4f  %8.4f\n", r$model, r$accuracy*100, r$f1_weighted, r$auc))
+}
+cat("\n")
+
+best_name  <- eval_results$model[which.max(eval_results$accuracy)]
+best_preds <- all_preds[[best_name]]
+cat("Best model:", best_name, "\n\n")
+
+cm_best <- conf_mat(best_preds, truth = outcome, estimate = .pred_class)
+print(cm_best)
+
+# Per-class precision / recall / F1 from confusion matrix
+compute_per_class <- function(cm_tbl, classes) {
+  map_dfr(classes, function(cls) {
+    tp   <- cm_tbl[cls, cls]
+    fp   <- sum(cm_tbl[, cls]) - tp
+    fn   <- sum(cm_tbl[cls, ]) - tp
+    prec <- if ((tp+fp)>0) tp/(tp+fp) else 0
+    rec  <- if ((tp+fn)>0) tp/(tp+fn) else 0
+    f1   <- if ((prec+rec)>0) 2*prec*rec/(prec+rec) else 0
+    tibble(class = cls, precision = prec, recall = rec, f1 = f1)
+  })
+}
+
+per_class     <- compute_per_class(cm_best$table, outcome_levels)
+all_per_class <- map_dfr(names(all_preds), function(nm) {
+  cm_i <- conf_mat(all_preds[[nm]], truth = outcome, estimate = .pred_class)
+  compute_per_class(cm_i$table, outcome_levels) %>% mutate(model = nm)
+})
+
+cat("\nPer-class metrics for the", best_name, ":\n")
+print(per_class)
+
+# =============================================================================
+# SAVING ARTEFACTS FOR ISSUE #8
+# =============================================================================
+saveRDS(rf_final,      file.path(output_dir, "rf_final.rds"))
+saveRDS(gb_final,      file.path(output_dir, "gb_final.rds"))
+saveRDS(xgb_final,     file.path(output_dir, "xgb_final.rds"))
+saveRDS(nn_final,      file.path(output_dir, "nn_final.rds"))
+saveRDS(stack_model,   file.path(output_dir, "stack_model.rds"))
+saveRDS(eval_results,  file.path(output_dir, "eval_results.rds"))
+saveRDS(all_preds,     file.path(output_dir, "all_preds.rds"))
+saveRDS(all_per_class, file.path(output_dir, "all_per_class.rds"))
+saveRDS(per_class,     file.path(output_dir, "per_class_best.rds"))
+saveRDS(cm_best,       file.path(output_dir, "cm_best.rds"))
+
+# Write comprehensive_results.txt
+best_row <- eval_results %>% filter(model == best_name)
+lines <- c(
+  "FOOTBALL MATCH OUTCOME CLASSIFICATION PROJECT",
+  strrep("=", 60), "",
+  "BEST MODEL PERFORMANCE:", strrep("-", 25),
+  sprintf("Algorithm: %s", best_name),
+  sprintf("Accuracy: %.4f (%.2f%%)", best_row$accuracy, best_row$accuracy*100),
+  sprintf("F1-Score: %.4f",   best_row$f1_weighted),
+  sprintf("AUC Score: %.4f",  best_row$auc), "",
+  "ALL MODEL RESULTS:", strrep("-", 20)
+)
+for (i in seq_len(nrow(eval_results))) {
+  r <- eval_results[i,]
+  lines <- c(lines,
+             sprintf("%s:", r$model),
+             sprintf("  Accuracy: %.4f", r$accuracy),
+             sprintf("  F1-Score: %.4f", r$f1_weighted),
+             sprintf("  AUC Score: %.4f", r$auc), "")
+}
+lines <- c(lines,
+           "PYTHON BASELINE COMPARISON:", strrep("-", 30),
+           sprintf("  %-20s  %8s  %8s  %8s", "Model","Accuracy","F1","AUC"),
+           sprintf("  %-20s  %8s  %8s  %8s", "Random Forest (Py)",    "62.87%","0.6267","0.8176"),
+           sprintf("  %-20s  %8s  %8s  %8s", "Gradient Boost (Py)",   "64.16%","0.6412","0.8265"),
+           sprintf("  %-20s  %8s  %8s  %8s", "XGBoost (Py)",          "64.84%","0.6476","0.8326"),
+           sprintf("  %-20s  %8s  %8s  %8s", "Neural Network (Py)",   "59.45%","0.5941","0.7758"),
+           sprintf("  %-20s  %8s  %8s  %8s", "Stacking (Py)",         "65.36%","0.6533","0.8347")
+)
+writeLines(lines, file.path(output_dir, "comprehensive_results.txt"))
+
+cat("\n✓ Issue # 7 - Complete; models trained, comprehensive_results.txt saved\n")
