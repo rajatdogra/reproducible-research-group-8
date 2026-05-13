@@ -219,3 +219,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+classification/output/rf_final.rds
+classification/output/stack_model.rds
+classification/output/gb_final.rds
+classification/output/xgb_final.rds
+classification/output/nn_final.rds
+classification/output/all_preds.rds
+classification/output/stack_model.rds

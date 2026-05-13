@@ -1,0 +1,29 @@
+ERROR ANALYSIS REPORT
+==================================================
+
+Best Model: Stacking Ensemble
+Total Errors: 5570 / 13046 (42.7%)
+
+Home Win:
+  Total samples : 5102
+  Misclassified : 1173
+  Error rate    : 23.0%
+  Most often misclassified as: Away Win
+
+Draw:
+  Total samples : 4500
+  Misclassified : 2308
+  Error rate    : 51.3%
+  Most often misclassified as: Home Win
+
+Away Win:
+  Total samples : 3444
+  Misclassified : 2089
+  Error rate    : 60.7%
+  Most often misclassified as: Home Win
+
+PYTHON BASELINE (Stacking Ensemble):
+  Total Errors : 5516 / 15925 (34.6%)
+  Home Win     : 33.5% error rate
+  Draw         : 40.3% error rate
+  Away Win     : 30.2% error rate
