@@ -1,0 +1,42 @@
+ETHICAL CONSIDERATIONS AND BIAS ANALYSIS
+=============================================
+
+Project: Football Match Outcome Classification (R Replication)
+Group 8 | Reproducible Research | University of Warsaw 2025-2026
+
+1. DATA BIAS CONSIDERATIONS:
+   - Historical bias: model learns from past records which may encode
+     structural advantages of well-funded or dominant leagues.
+   - Temporal bias: team form changes; older seasons may not reflect
+     present-day performance.
+   - Geographic bias: European top-flight leagues dominate the dataset,
+     leaving lower-profile and non-European football under-represented.
+
+2. FAIRNESS CONCERNS:
+   - Team fairness: model may over-predict wins for historically strong teams.
+   - League fairness: generalisation across leagues is uneven.
+   - Venue fairness: home advantage signal may amplify structural inequality.
+
+3. POTENTIAL MISUSE:
+   - Gambling: must NOT be used to inform betting decisions.
+     Error rate is ~34-35%; over-reliance could cause financial harm.
+   - Match fixing: public predictions could motivate manipulation.
+   - Financial decisions: transfers or sponsorship must not rely on this model.
+
+4. TRANSPARENCY:
+   - Feature importance charts provided (Random Forest Gini scores).
+   - Model limitations documented; ~65% accuracy is a realistic ceiling.
+   - Confidence calibration not formally evaluated.
+   - All code is open, version-controlled, reproducible via renv.lock.
+
+5. RECOMMENDATIONS:
+   - Retrain at the start of each season with recent data.
+   - Monitor prediction distributions per league for demographic drift.
+   - Provide confidence intervals alongside point predictions.
+   - Include responsible-use disclaimer before any deployment.
+   - Conduct a bias audit across leagues and competitive tiers.
+
+---------------------------------------------
+Prepared for Reproducible Research course, University of Warsaw 2025-2026)
+Replicates ethical section from the original Python ML2 project
+(Rajat Dogra & Umair Aziz, January 2026).

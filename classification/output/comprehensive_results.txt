@@ -1,0 +1,45 @@
+FOOTBALL MATCH OUTCOME CLASSIFICATION PROJECT
+============================================================
+
+BEST MODEL PERFORMANCE:
+-------------------------
+Algorithm: Stacking Ensemble
+Accuracy: 0.5730 (57.30%)
+F1-Score: 0.5653
+AUC Score: 0.7504
+
+ALL MODEL RESULTS:
+--------------------
+Random Forest:
+  Accuracy: 0.5569
+  F1-Score: 0.5605
+  AUC Score: 0.7431
+
+Gradient Boosting:
+  Accuracy: 0.5634
+  F1-Score: 0.5607
+  AUC Score: 0.7424
+
+XGBoost:
+  Accuracy: 0.5720
+  F1-Score: 0.5688
+  AUC Score: 0.7492
+
+Neural Network:
+  Accuracy: 0.5366
+  F1-Score: 0.5384
+  AUC Score: 0.7234
+
+Stacking Ensemble:
+  Accuracy: 0.5730
+  F1-Score: 0.5653
+  AUC Score: 0.7504
+
+PYTHON BASELINE COMPARISON:
+------------------------------
+  Model                 Accuracy        F1       AUC
+  Random Forest (Py)      62.87%    0.6267    0.8176
+  Gradient Boost (Py)     64.16%    0.6412    0.8265
+  XGBoost (Py)            64.84%    0.6476    0.8326
+  Neural Network (Py)     59.45%    0.5941    0.7758
+  Stacking (Py)           65.36%    0.6533    0.8347
