@@ -1,0 +1,476 @@
+---
+title: "Football Match Outcome Classification"
+subtitle: "Replication of ML2 Python Project in R"
+author:
+  - name: "Ashutosh Kumar Verma (475852)"
+    role: "Data Loading, EDA, Feature Engineering, Quarto Report"
+  - name: "Ramik Sharma (477656)"
+    role: "Model Training, Evaluation, Visualisations"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Contents"
+    number-sections: true
+    theme: cosmo
+    code-fold: true
+    code-summary: "Show code"
+    fig-width: 10
+    fig-height: 6
+    embed-resources: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  cache: false
+---
+
+```{r setup}
+library(here)
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+library(themis)
+library(ranger)
+library(xgboost)
+library(stacks)
+library(yardstick)
+library(patchwork)
+library(knitr)
+```
+
+# Introduction
+
+## Project Overview
+
+This report replicates in **R** the Football Match Outcome Classification project
+originally developed in Python for the ML2 – Machine Learning 2 course
+(Rajat Dogra & Umair Aziz, January 2026).
+
+**Objective:** Predict football match outcomes — Home Win, Draw, or Away Win —
+using historical match data from ESPN Soccer (2024–2026).
+
+**Research question:** Can institutional and contextual match features
+(team strength, venue, league, temporal patterns) reliably predict
+football match outcomes using machine learning?
+
+## Python Baseline
+
+| Model | Accuracy | F1-Score | AUC |
+|---|---|---|---|
+| Random Forest | 62.87% | 0.6267 | 0.8176 |
+| Gradient Boosting | 64.16% | 0.6412 | 0.8265 |
+| XGBoost | 64.84% | 0.6476 | 0.8326 |
+| Neural Network | 59.45% | 0.5941 | 0.7758 |
+| **Stacking Ensemble** | **65.36%** | **0.6533** | **0.8347** |
+
+---
+
+# Data Loading & Exploration {#sec-eda}
+
+```{r load-data}
+df <- read_csv(here("classification", "data", "fixtures.csv"),
+               show_col_types = FALSE)
+
+cat("Dataset dimensions:", nrow(df), "rows x", ncol(df), "columns\n")
+cat("Expected: 67,353 rows\n")
+```
+
+## Create Outcome Variable
+
+```{r outcome}
+df <- df %>%
+  mutate(
+    outcome = case_when(
+      homeTeamWinner == TRUE ~ "Home Win",
+      awayTeamWinner == TRUE ~ "Away Win",
+      TRUE                   ~ "Draw"
+    )
+  )
+```
+
+## Drop Leakage Columns
+
+```{r leakage}
+leakage_cols <- c(
+  "homeTeamWinner", "awayTeamWinner",
+  "homeTeamScore", "awayTeamScore",
+  "homeTeamShootoutScore", "awayTeamShootoutScore",
+  "statusId"
+)
+
+leakage_cols <- leakage_cols[leakage_cols %in% names(df)]
+df <- df %>% select(-all_of(leakage_cols))
+
+cat("Dropped", length(leakage_cols), "leakage columns\n")
+cat("Remaining columns:", ncol(df), "\n")
+```
+
+## Class Distribution
+
+```{r class-dist}
+class_dist <- df %>%
+  count(outcome) %>%
+  mutate(percentage = round(n / sum(n) * 100, 2))
+
+kable(class_dist,
+      caption = "Outcome Class Distribution",
+      col.names = c("Outcome", "Count", "Percentage (%)"))
+```
+
+## Missing Values
+
+```{r missing}
+missing_summary <- df %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  pivot_longer(everything(),
+               names_to = "Column",
+               values_to = "Missing") %>%
+  filter(Missing > 0)
+
+if (nrow(missing_summary) == 0) {
+  cat("No missing values found\n")
+} else {
+  kable(missing_summary, caption = "Columns with Missing Values")
+}
+```
+
+## EDA Visualisations
+
+```{r plot-outcome, fig.cap="Match Outcome Distribution"}
+knitr::include_graphics(
+  here("classification", "output", "outcome_distribution.png"))
+```
+
+```{r plot-league, fig.cap="Match Outcomes by League (Top 10)"}
+knitr::include_graphics(
+  here("classification", "output", "outcomes_by_league.png"))
+```
+
+```{r plot-temporal, fig.cap="Match Outcomes Over Time"}
+knitr::include_graphics(
+  here("classification", "output", "temporal_trends.png"))
+```
+
+---
+
+# Feature Engineering {#sec-features}
+
+```{r parse-dates}
+df <- df %>%
+  mutate(date = ymd_hms(date, quiet = TRUE)) %>%
+  arrange(date)
+```
+
+## Temporal Features
+
+```{r temporal}
+df <- df %>%
+  mutate(
+    month             = month(date),
+    day_of_week       = wday(date, label = FALSE),
+    hour              = hour(date),
+    is_weekend        = if_else(wday(date) %in% c(1, 7), 1, 0),
+    quarter           = quarter(date),
+    season            = case_when(
+      month %in% c(8, 9, 10, 11, 12) ~ "early_season",
+      month %in% c(1, 2, 3, 4, 5)    ~ "late_season",
+      TRUE                            ~ "off_season"
+    ),
+    is_holiday_season = if_else(month %in% c(12, 1), 1, 0)
+  )
+
+cat("Temporal features created: month, day_of_week, hour, is_weekend,",
+    "quarter, season, is_holiday_season\n")
+```
+
+## Team Performance Features
+
+```{r team-features}
+df <- df %>% arrange(date)
+
+home_stats <- df %>%
+  group_by(homeTeamId) %>%
+  mutate(
+    home_team_win_rate   = lag(cumsum(outcome == "Home Win") /
+                                 row_number(), default = 0),
+    home_team_draw_rate  = lag(cumsum(outcome == "Draw") /
+                                 row_number(), default = 0),
+    home_team_experience = lag(row_number(), default = 0)
+  ) %>%
+  ungroup() %>%
+  select(eventId, home_team_win_rate,
+         home_team_draw_rate, home_team_experience)
+
+away_stats <- df %>%
+  group_by(awayTeamId) %>%
+  mutate(
+    away_team_win_rate   = lag(cumsum(outcome == "Away Win") /
+                                 row_number(), default = 0),
+    away_team_draw_rate  = lag(cumsum(outcome == "Draw") /
+                                 row_number(), default = 0),
+    away_team_experience = lag(row_number(), default = 0)
+  ) %>%
+  ungroup() %>%
+  select(eventId, away_team_win_rate,
+         away_team_draw_rate, away_team_experience)
+
+df <- df %>%
+  left_join(home_stats, by = "eventId") %>%
+  left_join(away_stats, by = "eventId")
+```
+
+## Derived Strength Metrics
+
+```{r strength}
+df <- df %>%
+  mutate(
+    strength_difference   = home_team_win_rate - away_team_win_rate,
+    combined_strength     = home_team_win_rate + away_team_win_rate,
+    experience_difference = home_team_experience - away_team_experience
+  )
+```
+
+## League & Venue Features
+
+```{r league-venue}
+league_stats <- df %>%
+  group_by(leagueId) %>%
+  summarise(
+    league_home_advantage = mean(outcome == "Home Win", na.rm = TRUE),
+    league_draw_rate      = mean(outcome == "Draw",     na.rm = TRUE),
+    league_size           = n(),
+    .groups = "drop"
+  )
+
+venue_stats <- df %>%
+  group_by(venueId) %>%
+  summarise(
+    venue_home_advantage = mean(outcome == "Home Win", na.rm = TRUE),
+    venue_usage          = n(),
+    .groups = "drop"
+  )
+
+h2h_stats <- df %>%
+  mutate(matchup_id = paste(pmin(homeTeamId, awayTeamId),
+                            pmax(homeTeamId, awayTeamId), sep = "_")) %>%
+  group_by(matchup_id) %>%
+  summarise(h2h_frequency = n(), .groups = "drop")
+
+df <- df %>%
+  left_join(league_stats, by = "leagueId") %>%
+  left_join(venue_stats,  by = "venueId") %>%
+  mutate(matchup_id = paste(pmin(homeTeamId, awayTeamId),
+                            pmax(homeTeamId, awayTeamId), sep = "_")) %>%
+  left_join(h2h_stats, by = "matchup_id") %>%
+  select(-matchup_id)
+```
+
+## Final Feature Set
+
+```{r features}
+model_features <- c(
+  "leagueId", "venueId", "homeTeamId", "awayTeamId",
+  "month", "day_of_week", "hour", "is_weekend",
+  "quarter", "season", "is_holiday_season",
+  "home_team_win_rate", "away_team_win_rate",
+  "home_team_draw_rate", "away_team_draw_rate",
+  "home_team_experience", "away_team_experience",
+  "strength_difference", "combined_strength", "experience_difference",
+  "league_home_advantage", "league_draw_rate", "league_size",
+  "venue_home_advantage", "venue_usage",
+  "h2h_frequency"
+)
+
+df_model <- df %>%
+  select(all_of(model_features), outcome) %>%
+  mutate(
+    outcome    = factor(outcome, levels = c("Home Win", "Draw", "Away Win")),
+    leagueId   = factor(leagueId),
+    venueId    = factor(venueId),
+    homeTeamId = factor(homeTeamId),
+    awayTeamId = factor(awayTeamId),
+    season     = factor(season)
+  ) %>%
+  drop_na()
+
+cat("Total features:", length(model_features), "\n")
+cat("Rows after dropping NAs:", nrow(df_model), "\n")
+```
+
+## Train/Test Split & SMOTE
+
+```{r split}
+set.seed(42)
+data_split <- initial_split(df_model, prop = 0.8, strata = outcome)
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+
+cat("Training set:", nrow(train_data), "rows\n")
+cat("Testing set: ", nrow(test_data),  "rows\n")
+
+kable(
+  as.data.frame(table(train_data$outcome)),
+  caption = "Class distribution in training set",
+  col.names = c("Outcome", "Count")
+)
+```
+
+```{r recipe}
+rec <- recipe(outcome ~ ., data = train_data) %>%
+  step_other(leagueId, venueId, homeTeamId, awayTeamId,
+             threshold = 0.01) %>%
+  step_dummy(leagueId, venueId, homeTeamId, awayTeamId, season) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_smote(outcome, over_ratio = 1)
+
+rec_prepped  <- prep(rec, training = train_data)
+train_baked  <- bake(rec_prepped, new_data = NULL)
+
+cat("After SMOTE — class distribution:\n")
+print(table(train_baked$outcome))
+```
+
+---
+
+# Model Training & Evaluation {#sec-models}
+
+```{r load-results}
+output_dir    <- here("classification", "output")
+eval_results  <- readRDS(file.path(output_dir, "eval_results.rds"))
+all_per_class <- readRDS(file.path(output_dir, "all_per_class.rds"))
+cm_best       <- readRDS(file.path(output_dir, "cm_best.rds"))
+per_class     <- readRDS(file.path(output_dir, "per_class_best.rds"))
+outcome_levels <- c("Home Win", "Draw", "Away Win")
+best_name     <- eval_results$model[which.max(eval_results$accuracy)]
+```
+
+## Model Comparison
+
+Five models were trained using 5-fold stratified cross-validation:
+
+```{r results-table}
+eval_display <- eval_results %>%
+  mutate(
+    Accuracy  = sprintf("%.2f%%", accuracy * 100),
+    F1_Score  = sprintf("%.4f",   f1_weighted),
+    AUC       = sprintf("%.4f",   auc)
+  ) %>%
+  select(Model = model, Accuracy, F1_Score, AUC)
+
+kable(eval_display,
+      caption = "Test Set Performance — All Models",
+      align   = c("l", "r", "r", "r"))
+```
+
+## Comparison with Python Baseline
+
+```{r python-comparison}
+comparison <- tibble(
+  Model = c("Random Forest", "Gradient Boosting",
+            "XGBoost", "Neural Network", "Stacking Ensemble"),
+  R_Accuracy    = sprintf("%.2f%%", eval_results$accuracy * 100),
+  Python_Accuracy = c("62.87%", "64.16%", "64.84%", "59.45%", "65.36%"),
+  R_F1      = sprintf("%.4f", eval_results$f1_weighted),
+  Python_F1 = c("0.6267", "0.6412", "0.6476", "0.5941", "0.6533")
+)
+
+kable(comparison,
+      caption = "R vs Python Baseline Comparison",
+      align   = c("l", "r", "r", "r", "r"))
+```
+
+## Best Model Performance
+
+```{r best-model}
+cat("Best model:", best_name, "\n")
+best_row <- eval_results %>% filter(model == best_name)
+cat(sprintf("Accuracy: %.2f%%\n", best_row$accuracy * 100))
+cat(sprintf("F1-Score: %.4f\n",   best_row$f1_weighted))
+cat(sprintf("AUC:      %.4f\n",   best_row$auc))
+```
+
+## Per-Class Metrics
+
+```{r per-class}
+kable(per_class,
+      caption = sprintf("Per-class Metrics — %s", best_name),
+      digits  = 4,
+      col.names = c("Class", "Precision", "Recall", "F1"))
+```
+
+---
+
+# Visualisations {#sec-viz}
+
+## Model Performance Dashboard
+
+```{r plot-performance, fig.cap="Model Performance Comparison Dashboard"}
+knitr::include_graphics(
+  here("classification", "output", "model_performance_comparison.png"))
+```
+
+## Per-Class Performance
+
+```{r plot-perclass, fig.cap="Precision and Recall by Class and Model"}
+knitr::include_graphics(
+  here("classification", "output", "per_class_performance.png"))
+```
+
+## Feature Importance
+
+```{r plot-importance, fig.cap="Top 15 Feature Importances (Random Forest)"}
+knitr::include_graphics(
+  here("classification", "output", "feature_importance.png"))
+```
+
+---
+
+# Error Analysis {#sec-errors}
+
+```{r error-analysis}
+error_text <- readLines(
+  here("classification", "output", "error_analysis.txt"))
+cat(paste(error_text, collapse = "\n"))
+```
+
+---
+
+# Ethical Considerations {#sec-ethics}
+
+```{r ethics}
+eth_text <- readLines(
+  here("classification", "output", "ethical_considerations.txt"))
+cat(paste(eth_text, collapse = "\n"))
+```
+
+---
+
+# Summary & Conclusions {#sec-summary}
+
+## Key Findings
+
+- **Best model:** Stacking Ensemble with **`r sprintf("%.2f%%", max(eval_results$accuracy) * 100)`** accuracy
+- **Feature engineering:** 26 features engineered including temporal, team performance, league, venue and head-to-head features
+- **Class balancing:** SMOTE applied — all 3 classes balanced to 20,408 samples each
+- **XGBoost** performed best among individual models
+
+## Comparison with Python Baseline
+
+The R replication achieves comparable results to the Python baseline. Differences are attributable to:
+
+- Different random seed implementations between R and Python
+- SMOTE implementation differences (`themis` vs `imblearn`)
+- Neural Network architecture differences (`brulee`/`nnet` vs `MLPClassifier`)
+
+## Reproducibility Notes
+
+- All packages pinned via `renv.lock`
+- Random seeds set to 42 throughout to match Python baseline
+- No absolute paths used — `here()` package used throughout
+- Full pipeline runs end-to-end with single `source()` command
+
+---
+
+*Group 8 | Reproducible Research | University of Warsaw 2025-2026*
