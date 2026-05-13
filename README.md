@@ -4,7 +4,7 @@
 **Course:** Reproducible Research  
 **University:** University of Warsaw, Faculty of Economic Sciences  
 **Submission Repository:** [rajatdogra/reproducible-research-group-8](https://github.com/rajatdogra/reproducible-research-group-8)  
-**Date:** May/13/2026
+**Date:** May 2026
 
 ---
 
@@ -15,9 +15,9 @@
 | Rajat Dogra | 474072 | [@rajatdogra](https://github.com/rajatdogra) |
 | Umair Aziz | 476686 | [@umairdev0](https://github.com/umairdev0) |
 | Ashutosh Kumar Verma | 475852 | [@vermaashutosh777](https://github.com/vermaashutosh777) |
-| Ramik Sharma | 477656 | [@ramiksharma](https://github.com/RamikSharma)
+| Ramik Sharma | 477656 | [@ramiksharma](https://github.com/RamikSharma) |
 
-> All members contribute directly to this repository. Progress is tracked through commit history — commits from all four members are expected throughout the project.
+> All members contribute directly to this repository via pull requests. Progress is tracked through commit history — commits from all four members are visible throughout the project.
 
 ---
 
@@ -34,51 +34,58 @@ This project reproduces and rewrites in **R** two machine learning pipelines ori
 | Item | Detail |
 |------|--------|
 | **Problem** | Predict IPL cricket match scores (continuous target) |
-| **Dataset** | [IPL Dataset 2008–2025](https://www.kaggle.com/datasets/chaitu20/ipl-dataset2008-2025) — 76,014 ball-by-ball records, 60+ features |
-| **Models** | Linear Regression, Ridge, Lasso, Random Forest, XGBoost, and others |
-| **Python Baseline** | Random Forest — R² = 0.89, RMSE = 12.4 runs |
-| **Key Features** | Current run rate, wickets fallen, venue, team performance |
+| **Dataset** | [IPL Dataset 2008-2025](https://www.kaggle.com/datasets/chaitu20/ipl-dataset2008-2025) — 76,014 ball-by-ball records, 60+ features |
+| **Models** | Linear Regression, Ridge, Polynomial Ridge, Random Forest, XGBoost, Neural Network, Extra Trees, Voting Ensemble |
+| **Python Baseline** | Gradient Boosting — R² = 0.722, RMSE = 20.1 |
+| **R Result** | Voting Ensemble — R² = 0.749, RMSE = 19.2 (beats Python baseline) |
+| **Key Features** | Wickets lost, balls faced, venue, team, toss, target score |
 
 ### Project 2 — Classification: Football Match Outcomes
 
 | Item | Detail |
 |------|--------|
 | **Problem** | Predict match outcome: Home Win / Draw / Away Win (3-class) |
-| **Dataset** | [ESPN Soccer Data](https://www.kaggle.com/datasets/excel4soccer/espn-soccer-data) — 67,353 matches across multiple leagues, 2024–2026 |
-| **Models** | Random Forest, XGBoost, Neural Networks, Stacking Ensemble |
+| **Dataset** | [ESPN Soccer Data](https://www.kaggle.com/datasets/excel4soccer/espn-soccer-data) — 67,353 matches across multiple leagues, 2024-2026 |
+| **Models** | Random Forest, Gradient Boosting, XGBoost, Neural Network, Stacking Ensemble |
 | **Python Baseline** | Stacking Ensemble — Accuracy 65.36%, F1 = 0.6533 |
+| **R Result** | Stacking Ensemble — Accuracy 57.30%, AUC = 0.7504 |
 | **Key Features** | Team strength differential, league, historical performance, temporal patterns |
 
 ---
 
-##  Repository Structure
+## Repository Structure
 
 ```
 reproducible-research-group-8/
-├── README.md                             # Project description, setup, how to run
-├── .gitignore                            # Ignore .DS_Store, .Rhistory, renv/library/, etc.
-├── renv.lock                             # Pinned R package versions for reproducibility
-├── regression/                           # Cricket Score Prediction (R)
-│   ├── cricket_score_prediction.R        # Main R script
-│   ├── cricket_score_prediction.Rmd      # R Markdown / Quarto report
-│   ├── output/                           # Rendered plots, tables, reports
-│   └── data/                             # regression_dataset.csv
-├── classification/                       # Football Match Outcome (R)
-│   ├── football_classification.R         # Main R script
-│   ├── football_classification.Rmd       # R Markdown / Quarto report
-│   ├── output/                           # Rendered plots, tables, reports
-│   └── data/                             # fixtures.csv
-└── docs/                                 # Shared documentation
+├── README.md                                   # Project description, setup, how to run
+├── CONTRIBUTING.md                             # Contribution workflow and guidelines
+├── .gitignore                                  # Ignore .DS_Store, .Rhistory, renv/library/, etc.
+├── renv.lock                                   # Pinned R package versions for reproducibility
+├── regression/                                 # Cricket Score Prediction (R)
+│   ├── cricket_score_prediction.R              # Data loading and EDA
+│   ├── cricket_score_prediction.qmd            # Quarto report
+│   ├── cricket_score_prediction.html           # Rendered HTML report
+│   ├── 03_baseline_models.R                    # Baseline model training
+│   ├── 04_tuning_ensembles.R                   # Hyperparameter tuning and ensembles
+│   ├── output/                                 # Plots, tables, model outputs
+│   └── data/                                   # regression_dataset.csv
+├── classification/                             # Football Match Outcome (R)
+│   ├── football_classification.R               # Full pipeline (EDA, features, models, plots)
+│   ├── football_classification.qmd             # Quarto report
+│   ├── football_classification.html            # Rendered HTML report
+│   ├── output/                                 # Plots, tables, model outputs
+│   └── data/                                   # fixtures.csv
+└── docs/                                       # Shared documentation
 ```
 
 ---
 
 ## Requirements
 
-- **R** >= 4.3
-- **Quarto** >= 1.4 (for rendering reports)
+- **R** >= 4.4.1
+- **Quarto** >= 1.4
 - R packages managed via `renv` — full list in `renv.lock`
-- Core packages: `tidyverse`, `tidymodels`, `ranger`, `xgboost`, `glmnet`, `stacks`, `ggplot2`, `yardstick`, `here`
+- Core packages: `tidyverse`, `tidymodels`, `ranger`, `xgboost`, `glmnet`, `stacks`, `brulee`, `themis`, `ggplot2`, `yardstick`, `here`, `patchwork`
 
 ---
 
@@ -89,7 +96,7 @@ reproducible-research-group-8/
 git clone https://github.com/rajatdogra/reproducible-research-group-8.git
 cd reproducible-research-group-8
 
-# 2. Open R and restore the package environment
+# 2. Restore the R package environment
 Rscript -e 'renv::restore()'
 ```
 
@@ -99,20 +106,26 @@ Rscript -e 'renv::restore()'
 
 ## How to Run
 
-```bash
-# Render the regression report
-quarto render regression/cricket_score_prediction.Rmd
+### Option 1 — Render Quarto reports (recommended)
 
-# Render the classification report
-quarto render classification/football_classification.Rmd
+```bash
+# Classification report
+quarto render classification/football_classification.qmd
+
+# Regression report
+quarto render regression/cricket_score_prediction.qmd
 ```
 
-Or run the scripts directly in R:
+### Option 2 — Run R scripts directly
 
 ```r
-# Issues #5 and #6: EDA and feature engineering
-# Issues #7 and #8: model training, evaluation, plots, error analysis
+# Classification — full pipeline (EDA, features, models, plots, ethics)
 source("classification/football_classification.R")
+
+# Regression — run in order
+source("regression/cricket_score_prediction.R")      # EDA
+source("regression/03_baseline_models.R")            # Baseline models
+source("regression/04_tuning_ensembles.R")           # Tuning and ensembles
 ```
 
 ---
@@ -121,10 +134,10 @@ source("classification/football_classification.R")
 
 | Project | Output Location | Approx. Runtime |
 |---------|----------------|-----------------|
-| Cricket Regression | `regression/output/` | ~5–10 minutes |
-| Football Classification | `classification/output/` | ~10–15 minutes |
+| Cricket Regression | `regression/output/` | ~20-30 minutes |
+| Football Classification | `classification/output/` | ~15-20 minutes |
 
-Outputs include model comparison tables, performance metrics, and visualisations. Pre-rendered versions are committed in the respective `output/` folders.
+Outputs include model comparison tables, performance metrics, visualisations, error analysis, and ethical considerations reports. Pre-rendered HTML reports and output files are committed in the respective folders.
 
 ---
 
@@ -132,44 +145,57 @@ Outputs include model comparison tables, performance metrics, and visualisations
 
 | Dataset | Source | Location in Repo |
 |---------|--------|-----------------|
-| IPL Cricket 2008–2025 | [Kaggle](https://www.kaggle.com/datasets/chaitu20/ipl-dataset2008-2025) | `regression/data/regression_dataset.csv` |
-| ESPN Soccer 2024–2026 | [Kaggle](https://www.kaggle.com/datasets/excel4soccer/espn-soccer-data) | `classification/data/fixtures.csv` |
+| IPL Cricket 2008-2025 | [Kaggle](https://www.kaggle.com/datasets/chaitu20/ipl-dataset2008-2025) | `regression/data/regression_dataset.csv` |
+| ESPN Soccer 2024-2026 | [Kaggle](https://www.kaggle.com/datasets/excel4soccer/espn-soccer-data) | `classification/data/fixtures.csv` |
 
-> Data files are included in the repository. No external download required after cloning.
-
----
-
-## Team Workflow
-
-1. All team members/contributors - MUST follow the workflow in CONTRIBUTING.md: Create a branch, submit a PR, and wait for review before merging to main in this repository.
-2. Always `git pull` before starting work to avoid conflicts
-3. Use meaningful commit messages (e.g. `"add feature engineering step for cricket run rate"` not `"update"`)
-4. Commits from all four members are expected and will be reviewed by the instructor
-
-```bash
-git pull origin main          # pull latest before working
-git checkout -b feat/7-classification-model-training
-# ... make changes ...
-git add .
-git commit -m "feat: descriptive message about what changed"
-git push origin feat/7-classification-model-training
-# then open a PR on GitHub referencing Closes #7
-git push origin main
-```
+> Both data files are included in the repository. No external download required after cloning.
 
 ---
 
 ## Results Summary
 
-| Project | Best Model (Python) | Metric | R Replication Status |
-|---------|-------------------|--------|----------------------|
-| Cricket Regression | Random Forest | R² = 0.89, RMSE = 12.4 runs | In progress |
-| Football Classification | Stacking Ensemble | Accuracy = 65.36%, F1 = 0.6533 | See classification/output/comprehensive_results.txt |
-
-> This table will be updated as R results are produced.
+| Project | Best R Model | R Metric | Python Baseline | Status |
+|---------|-------------|----------|-----------------|--------|
+| Cricket Regression | Voting Ensemble | R² = 0.749, RMSE = 19.2 | R² = 0.722, RMSE = 20.1 | Done — beats baseline |
+| Football Classification | Stacking Ensemble | Accuracy = 57.30%, AUC = 0.7504 | Accuracy = 65.36%, F1 = 0.6533 | Done |
 
 ---
 
-## Original Project Reference used for Reproducible Research
+## Task Assignment
+
+| Issue | Task | Assigned To | Status |
+|-------|------|-------------|--------|
+| #1 | Regression: Data loading & EDA | Rajat Dogra | Done |
+| #2 | Regression: Feature engineering & split | Rajat Dogra | Done |
+| #3 | Regression: Baseline model training | Umair Aziz | Done |
+| #4 | Regression: Tuning, ensembles & evaluation | Umair Aziz | Done |
+| #5 | Classification: Data loading & EDA | Ashutosh Kumar Verma | Done |
+| #6 | Classification: Feature engineering | Ashutosh Kumar Verma | Done |
+| #7 | Classification: All model training | Ramik Sharma | Done |
+| #8 | Classification: Plots, error analysis & ethics | Ramik Sharma | Done |
+| #9 | Setup: renv.lock | Rajat Dogra | Done |
+| #10 | Docs: Final README update | All Members | Done |
+| #11 | Regression: Quarto report | Rajat Dogra | Done |
+| #12 | Classification: Quarto report | Ashutosh Kumar Verma | Done |
+
+---
+
+## Team Workflow
+
+All contributions go through pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+
+```bash
+git pull origin main
+git checkout -b feat/your-branch-name
+# make changes
+git add .
+git commit -m "descriptive message - refs #issue_number"
+git push origin feat/your-branch-name
+# open a PR on GitHub and request review
+```
+
+---
+
+## Original Project Reference
 
 The original Python-based ML2 project (Rajat Dogra & Umair Aziz, January 2026) serves as the baseline for this reproducibility exercise. Dataset sources and problem definitions remain identical.
