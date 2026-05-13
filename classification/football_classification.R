@@ -618,7 +618,7 @@ prob_cols <- paste0(".pred_", outcome_levels)
 eval_results <- map_dfr(names(all_preds), function(nm) {
   p   <- all_preds[[nm]]
   acc <- accuracy(p, truth = outcome, estimate = .pred_class)$.estimate
-  f1  <- f_meas(p,   truth = outcome, estimate = .pred_class, estimator = "weighted")$.estimate
+  f1  <- f_meas(p,   truth = outcome, estimate = .pred_class, estimator = "macro_weighted")$.estimate
   auc <- roc_auc(p,  truth = outcome, any_of(prob_cols), estimator = "macro_weighted")$.estimate
   tibble(model = nm, accuracy = acc, f1_weighted = f1, auc = auc)
 })
