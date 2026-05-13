@@ -783,7 +783,7 @@ p_auc <- ggplot(eval_results,
   bar_theme
 
 cm_tidy <- as_tibble(cm_best$table) %>%
-  rename(Truth = truth, Prediction = estimate, Count = n) %>%
+  rename(Count = n) %>%
   mutate(Truth      = factor(Truth,      levels = outcome_levels),
          Prediction = factor(Prediction, levels = outcome_levels))
 
