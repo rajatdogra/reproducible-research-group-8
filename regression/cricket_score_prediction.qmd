@@ -1,0 +1,330 @@
+---
+title: "Cricket Score Prediction — Regression"
+subtitle: "Replication of ML2 Python Project in R"
+author:
+  - name: "Rajat Dogra (474072)"
+    role: "Data Loading, EDA, Feature Engineering, Model Training"
+  - name: "Umair Aziz (476686)"
+    role: "Hyperparameter Tuning, Ensembles, Evaluation"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Contents"
+    number-sections: true
+    theme: cosmo
+    code-fold: true
+    code-summary: "Show code"
+    fig-width: 10
+    fig-height: 6
+    embed-resources: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  cache: false
+---
+
+```{r setup}
+library(here)
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(ranger)
+library(xgboost)
+library(knitr)
+```
+
+# Introduction
+
+## Project Overview
+
+This report replicates in **R** the Cricket Score Prediction project
+originally developed in Python for the ML2 – Machine Learning 2 course
+(Rajat Dogra & Umair Aziz, January 2026).
+
+**Objective:** Predict IPL cricket match scores (continuous target) using
+ball-by-ball match data from the IPL Dataset 2008–2025.
+
+**Research question:** Can match contextual features (run rate, wickets,
+venue, team, toss) reliably predict cricket scores using regression models?
+
+## Dataset
+
+- **Source:** [IPL Dataset 2008–2025](https://www.kaggle.com/datasets/chaitu20/ipl-dataset2008-2025)
+- **Size:** 76,014 ball-by-ball records, 60+ features
+- **Target:** `final_score` — the total runs scored in an innings
+
+## Python Baseline
+
+| Model | R² | RMSE | MAE |
+|---|---|---|---|
+| Linear Regression | 0.6032 | — | — |
+| Ridge Regression | 0.6031 | — | — |
+| Polynomial Ridge | 0.6793 | — | — |
+| Random Forest | 0.6989 | — | — |
+| **Gradient Boosting (best)** | **0.7222** | **20.1** | **14.8** |
+
+---
+
+# Data Loading & Exploration {#sec-eda}
+
+```{r load-data}
+df <- read_csv(
+  here("regression", "data", "regression_dataset.csv"),
+  show_col_types = FALSE
+)
+
+cat("Dataset dimensions:", nrow(df), "rows x", ncol(df), "columns\n")
+```
+
+## Summary Statistics
+
+```{r summary}
+cat("Score range:", min(df$final_score, na.rm=TRUE),
+    "-", max(df$final_score, na.rm=TRUE), "runs\n")
+cat("Average score:", round(mean(df$final_score, na.rm=TRUE), 1),
+    "±", round(sd(df$final_score, na.rm=TRUE), 1), "\n")
+
+missing_total <- sum(is.na(df))
+cat("Total missing values:", missing_total, "\n")
+cat("Duplicate rows:", sum(duplicated(df)), "\n")
+```
+
+## Feature Correlations
+
+```{r correlations}
+numeric_cols <- df %>% select(where(is.numeric))
+
+correlations <- numeric_cols %>%
+  summarise(across(everything(),
+                   ~cor(., df$final_score, use = "complete.obs"))) %>%
+  pivot_longer(everything(),
+               names_to  = "feature",
+               values_to = "correlation") %>%
+  filter(feature != "final_score") %>%
+  mutate(abs_corr = abs(correlation)) %>%
+  arrange(desc(abs_corr)) %>%
+  slice_head(n = 5)
+
+kable(correlations,
+      caption = "Top 5 Features Correlated with final_score",
+      digits  = 3)
+```
+
+## EDA Visualisations
+
+```{r plot-dist, fig.cap="Score Distribution"}
+knitr::include_graphics(
+  here("regression", "output", "01_score_distribution.png"))
+```
+
+```{r plot-team, fig.cap="Average Score by Team"}
+knitr::include_graphics(
+  here("regression", "output", "02_team_avg_score.png"))
+```
+
+```{r plot-venue, fig.cap="Venue Effects on Score"}
+knitr::include_graphics(
+  here("regression", "output", "03_venue_effects.png"))
+```
+
+```{r plot-wickets, fig.cap="Wickets vs Score"}
+knitr::include_graphics(
+  here("regression", "output", "04_wickets_vs_score.png"))
+```
+
+---
+
+# Data Preprocessing & Feature Engineering {#sec-features}
+
+```{r preprocessing}
+# Select features matching Python pipeline
+selected_features <- c(
+  "innings", "team", "wickets_lost", "balls_faced",
+  "venue", "city", "toss_winner", "toss_decision",
+  "year", "month", "day", "target_score"
+)
+
+# Keep only columns that exist
+selected_features <- selected_features[selected_features %in% names(df)]
+
+df_model <- df %>%
+  select(all_of(selected_features), final_score) %>%
+  drop_na()
+
+cat("Features selected:", length(selected_features), "\n")
+cat("Rows after dropping NAs:", nrow(df_model), "\n")
+```
+
+## Train/Test Split
+
+```{r split}
+set.seed(42)
+data_split <- initial_split(df_model, prop = 0.8)
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+
+cat("Training set:", nrow(train_data), "rows\n")
+cat("Testing set: ", nrow(test_data),  "rows\n")
+cat("Python baseline — Training: ~60,811 / Testing: ~15,203\n")
+```
+
+## Preprocessing Recipe
+
+```{r recipe}
+rec <- recipe(final_score ~ ., data = train_data) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_other(all_nominal_predictors(), threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors())
+
+cat("Recipe steps:\n")
+cat("  - step_impute_median() : fill NAs with median\n")
+cat("  - step_other()         : collapse rare categories\n")
+cat("  - step_dummy()         : one-hot encode categoricals\n")
+cat("  - step_normalize()     : StandardScaler equivalent\n")
+```
+
+---
+
+# Baseline Model Training {#sec-baseline}
+
+```{r load-baseline}
+baseline_results <- read_csv(
+  here("regression", "output", "baseline_ranking.csv"),
+  show_col_types = FALSE
+)
+```
+
+Six baseline models were trained using 5-fold cross-validation,
+replicating the Python pipeline.
+
+```{r baseline-table}
+kable(baseline_results,
+      caption = "Baseline Model Rankings — Test Set Performance",
+      digits  = 3,
+      col.names = c("Rank", "Model", "MAE", "RMSE", "R²"))
+```
+
+**Key finding:** Random Forest achieves R²=`r round(baseline_results$R2[1], 3)`
+as the best baseline model, compared to the Python baseline of R²=0.6989. ✅
+
+---
+
+# Hyperparameter Tuning & Ensembles {#sec-tuning}
+
+```{r load-final}
+final_results <- read_csv(
+  here("regression", "output", "final_ranking.csv"),
+  show_col_types = FALSE
+)
+
+optim_results <- read_csv(
+  here("regression", "output", "optimization_impact.csv"),
+  show_col_types = FALSE
+)
+```
+
+## Final Model Rankings
+
+```{r final-table}
+kable(final_results,
+      caption = "Final Model Rankings — All Models Including Tuned & Ensembles",
+      digits  = 3,
+      col.names = c("Rank", "Model", "R²", "MAE", "RMSE"))
+```
+
+## Optimisation Impact
+
+```{r optim-table}
+kable(optim_results,
+      caption = "Hyperparameter Tuning Impact",
+      digits  = 3)
+```
+
+## Comparison with Python Baseline
+
+```{r python-comparison}
+best_r2   <- max(final_results$R2)
+best_model <- final_results$Model[which.max(final_results$R2)]
+best_rmse  <- final_results$RMSE[which.max(final_results$R2)]
+best_mae   <- final_results$MAE[which.max(final_results$R2)]
+
+comparison <- tibble(
+  Metric  = c("Best Model", "R²", "RMSE", "MAE"),
+  R_Result = c(best_model,
+               sprintf("%.3f", best_r2),
+               sprintf("%.1f", best_rmse),
+               sprintf("%.1f", best_mae)),
+  Python_Baseline = c("Gradient Boosting Optimised",
+                      "0.722", "20.1", "14.8")
+)
+
+kable(comparison,
+      caption = "R Replication vs Python Baseline",
+      col.names = c("Metric", "R Result", "Python Baseline"))
+```
+
+---
+
+# Visualisations {#sec-viz}
+
+## Model Performance Ranking
+
+```{r plot-ranking, fig.cap="Model Performance Ranking by R²"}
+knitr::include_graphics(
+  here("regression", "output", "ranking.png"))
+```
+
+## MAE vs RMSE Comparison
+
+```{r plot-mae-rmse, fig.cap="MAE vs RMSE Comparison Across Models"}
+knitr::include_graphics(
+  here("regression", "output", "mae_vs_rmse.png"))
+```
+
+## Predicted vs Actual
+
+```{r plot-pred-actual, fig.cap="Predicted vs Actual Scores — Best Model"}
+knitr::include_graphics(
+  here("regression", "output", "predicted_vs_actual.png"))
+```
+
+---
+
+# Summary & Conclusions {#sec-summary}
+
+## Key Findings
+
+- **Best model:** `r best_model` with R²=`r round(best_r2, 3)`,
+  RMSE=`r round(best_rmse, 1)` runs, MAE=`r round(best_mae, 1)` runs
+- **Python baseline beaten:** R²=`r round(best_r2, 3)` vs Python 0.722 ✅
+- **Hyperparameter tuning** improved XGBoost R² by
+  `r round(optim_results$Improvement[optim_results$Model == "XGBoost"], 3)`
+  and Random Forest by
+  `r round(optim_results$Improvement[optim_results$Model == "Random Forest"], 3)`
+- **Key predictors:** `target_score` and `balls_faced` most correlated
+  with final score
+
+## Practical Applications
+
+- **Sports analytics:** Team strategy optimisation
+- **Broadcasting:** Real-time score predictions
+- **Fantasy sports:** Player valuation
+- **Coaching:** Tactical decision support
+
+## Reproducibility Notes
+
+- All packages pinned via `renv.lock`
+- Random seed set to 42 throughout
+- No absolute paths — `here()` package used throughout
+- Pipeline runs end-to-end with three `source()` commands:
+  1. `source("regression/cricket_score_prediction.R")`
+  2. `source("regression/03_baseline_models.R")`
+  3. `source("regression/04_tuning_ensembles.R")`
+
+---
+
+*Group 8 | Reproducible Research | University of Warsaw 2025-2026*
