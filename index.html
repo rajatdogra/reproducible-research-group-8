@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reproducible Research — Group 8</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #212529;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .container { max-width: 680px; width: 100%; text-align: center; }
+    .badge {
+      display: inline-block;
+      background: #e9ecef;
+      color: #495057;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 1.25rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .subtitle { color: #6c757d; margin-bottom: 2.5rem; font-size: 0.95rem; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2.5rem; }
+    @media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
+    .card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 10px;
+      padding: 1.5rem 1.25rem;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s, transform 0.15s;
+      display: block;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10); transform: translateY(-2px); }
+    .card-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .card p { font-size: 0.82rem; color: #6c757d; line-height: 1.5; }
+    .card .tag {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-size: 0.72rem;
+      background: #e7f5ff;
+      color: #1971c2;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+    }
+    .card.green .tag { background: #ebfbee; color: #2f9e44; }
+    footer { font-size: 0.78rem; color: #adb5bd; }
+    footer a { color: #adb5bd; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">University of Warsaw · 2026</span>
+    <h1>Reproducible Research — Group 8</h1>
+    <p class="subtitle">R replication of two ML2 projects using tidymodels · Quarto · renv</p>
+
+    <div class="cards">
+      <a class="card" href="regression/cricket_score_prediction.html">
+        <div class="card-icon">🏏</div>
+        <h2>Cricket Score Prediction</h2>
+        <p>IPL 2008–2025 · Linear, Ridge, Lasso, Random Forest, XGBoost, Neural Network</p>
+        <span class="tag">Regression</span>
+      </a>
+      <a class="card green" href="classification/football_classification.html">
+        <div class="card-icon">⚽</div>
+        <h2>Football Match Outcome</h2>
+        <p>Win / Draw / Loss classification · SMOTE · Stacked ensemble</p>
+        <span class="tag">Classification</span>
+      </a>
+    </div>
+
+    <footer>
+      <a href="https://github.com/rajatdogra/reproducible-research-group-8">GitHub repository</a>
+      &nbsp;·&nbsp; Group 8
+    </footer>
+  </div>
+</body>
+</html>
