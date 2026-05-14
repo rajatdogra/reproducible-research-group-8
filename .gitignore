@@ -222,6 +222,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+regression/output/model_stack.rds
 classification/output/rf_final.rds
 classification/output/stack_model.rds
 classification/output/gb_final.rds
