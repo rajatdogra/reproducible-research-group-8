@@ -57,25 +57,33 @@ This project reproduces and rewrites in **R** two machine learning pipelines ori
 
 ```
 reproducible-research-group-8/
-├── README.md                                   # Project description, setup, how to run
-├── CONTRIBUTING.md                             # Contribution workflow and guidelines
-├── .gitignore                                  # Ignore .DS_Store, .Rhistory, renv/library/, etc.
-├── renv.lock                                   # Pinned R package versions for reproducibility
-├── regression/                                 # Cricket Score Prediction (R)
-│   ├── cricket_score_prediction.R              # Data loading and EDA
-│   ├── cricket_score_prediction.qmd            # Quarto report
-│   ├── cricket_score_prediction.html           # Rendered HTML report
-│   ├── 03_baseline_models.R                    # Baseline model training
-│   ├── 04_tuning_ensembles.R                   # Hyperparameter tuning and ensembles
-│   ├── output/                                 # Plots, tables, model outputs
-│   └── data/                                   # regression_dataset.csv
-├── classification/                             # Football Match Outcome (R)
-│   ├── football_classification.R               # Full pipeline (EDA, features, models, plots)
-│   ├── football_classification.qmd             # Quarto report
-│   ├── football_classification.html            # Rendered HTML report
-│   ├── output/                                 # Plots, tables, model outputs
-│   └── data/                                   # fixtures.csv
-└── docs/                                       # Shared documentation
+├── README.md                                        # Project description, setup, how to run
+├── CONTRIBUTING.md                                  # Contribution workflow and guidelines
+├── .gitignore                                       # Ignore .DS_Store, .Rhistory, renv/library/, etc.
+├── renv.lock                                        # Pinned R package versions for reproducibility
+├── setup_renv.R                                     # One-time environment setup script
+├── regression/                                      # Cricket Score Prediction (R)
+│   ├── cricket_score_prediction.R                   # Data loading and EDA
+│   ├── cricket_score_prediction.qmd                 # Quarto report
+│   ├── cricket_score_prediction.html                # Rendered HTML report
+│   ├── 03_baseline_models.R                         # Baseline model training
+│   ├── 04_tuning_ensembles.R                        # Hyperparameter tuning and ensembles
+│   ├── original_python/                             # Original Python baseline (reference)
+│   │   ├── Cricket_Score_Prediction_Final_Submission.ipynb
+│   │   └── Cricket_Score_Prediction_Final_Submission.pdf
+│   ├── output/                                      # Plots, tables, model outputs
+│   └── data/                                        # regression_dataset.csv
+├── classification/                                  # Football Match Outcome (R)
+│   ├── football_classification.R                    # Full pipeline (EDA, features, models, plots)
+│   ├── football_classification.qmd                  # Quarto report
+│   ├── football_classification.html                 # Rendered HTML report
+│   ├── original_python/                             # Original Python baseline (reference)
+│   │   ├── football_classification_complete.py
+│   │   ├── results/                                 # Python output files
+│   │   └── plots/                                   # Python plot files
+│   ├── output/                                      # Plots, tables, model outputs
+│   └── data/                                        # fixtures.csv
+└── docs/                                            # Shared documentation
 ```
 
 ---
