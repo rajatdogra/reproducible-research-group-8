@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Stale duplicate (superseded by .gitignore)
+/gitignore
+
 # Claude Code
 .claude/
 
